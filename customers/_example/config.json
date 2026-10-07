@@ -1,0 +1,12 @@
+{
+  "workStart": "09:00",
+  "workEnd": "18:00",
+  "workDays": [1, 2, 3, 4, 5],
+  "fps": 1,
+  "maxWidth": 1600,
+  "crf": 32,
+  "segmentSeconds": 300,
+  "retentionDays": 14,
+  "idleSeconds": 300,
+  "minFreeGB": 5
+}
