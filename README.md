@@ -4,22 +4,24 @@
 
 ## 설치 전: SSH·Tailscale 통로부터
 
-배포 기본은 USB zip입니다. 저장소 공개 여부에 의존하지 않습니다. 고객명·상호·위치·연락처·실제 업무 자료는 저장소에 넣지 않습니다.
+키트는 공개 저장소 `intellieffect/ax-field-kit-public`에서 로그인 없이 받습니다(USB·GitHub 로그인 불필요). 고객명·상호·위치·연락처·실제 업무 자료는 저장소에 넣지 않습니다.
 
 1. 고객 PC가 Windows 10/11인지, 관리자 권한·보안 프로그램·인터넷·여유 공간을 확인합니다. 권한/보안 거부는 즉시 중단합니다.
 2. 맥북에서 `tailscale status --json`의 `CurrentTailnet.Name`을 확인하고 **같은 테일넷**에서 Settings → Keys로 일회용·1일 만료·ephemeral 끔·`tag:ax-field` 키를 발급합니다. 인증 키와 정책 접근 키는 비밀 보관소에 둡니다. 값은 문서·인자·보고서에 적지 않습니다.
 3. 맥북 → `tag:ax-field` tcp:22 정책 초안을 미리 준비합니다. **담당자 확인 전 정책 적용 금지.** 태그 소유 권한도 확인합니다.
 4. 아래 Claude 설치·로그인 후, Claude가 **사람이 전용 계정 생성 → OpenSSH → Tailscale 설치 → 사람이 가입 → 맥북 SSH 확인**까지 먼저 진행합니다. 녹화 설치는 통로 확인 뒤입니다.
 5. 연결 판단은 맥북의 `nc -vz <ip> 22` / 일반 `ping`으로 합니다. `tailscale ping` 성공만으로 SSH가 된다고 판단하지 않습니다. 이 명령은 현장에서 승인된 고객 PC에만 실행합니다.
-6. 태그 기기는 Taildrop 사용 가능 여부를 별도로 확인합니다. Taildrop은 필수 조건이 아니며 USB·SSH/SFTP를 기본 통로로 씁니다. 받은 Taildrop 파일은 **다운로드 폴더**에서 찾습니다.
+6. 태그 기기는 Taildrop 사용 가능 여부를 별도로 확인합니다. Taildrop은 필수 조건이 아니며 SSH/SFTP를 기본 통로로 씁니다. 받은 Taildrop 파일은 **다운로드 폴더**에서 찾습니다.
 7. SSH 계정은 **원격 통로 전용 일반 계정**(Users 그룹만)입니다. 사람이 `new-access-account.ps1`로 만들고(암호는 사람이 화면에서 입력), 우리 공개키는 그 계정의 `.ssh\authorized_keys`에 주석 `ops-<고객>-<기기>-<날짜>`로 들어갑니다. 맥북 SSH 별칭 `User`에는 전용 계정 이름을 적습니다. 회수는 계정·프로필 삭제로 끝납니다. 경로는 `$env:USERPROFILE`·`Join-Path`로 처리하고 수동 명령의 경로는 따옴표로 감쌉니다. 녹화 예약 작업은 로그인한 고객 계정의 `DOMAIN\사용자`(Interactive/Limited)로 등록합니다. 관리자와 로그인 계정이 다르면 각각 구분해 확인합니다.
 
 ## 설치자가 직접 칠 것 (관리자 PowerShell)
 
-1. zip 풀기 (D: 는 USB 드라이브 문자에 맞게 바꾸기):
+1. 키트 받기 (인터넷만 있으면 된다):
    ```powershell
-   Expand-Archive D:\ax-field-kit.zip C:\ -Force; cd C:\ax-field-kit
+   cd $env:TEMP; iwr https://github.com/intellieffect/ax-field-kit-public/archive/refs/heads/main.zip -OutFile axk.zip -UseBasicParsing
+   Expand-Archive axk.zip axk -Force; Move-Item axk\ax-field-kit-public-main C:\ax-field-kit; Get-ChildItem C:\ax-field-kit -Recurse | Unblock-File; cd C:\ax-field-kit
    ```
+   (`C:\ax-field-kit`가 이미 있으면 Move-Item 이 멈춘다. 옛 폴더 이름을 바꾼 뒤 다시 실행)
 2. Claude Code 공식 설치:
    ```powershell
    irm https://claude.ai/install.ps1 | iex
@@ -46,26 +48,18 @@ Get-ChildItem *.ps1 | ForEach-Object { $e=$null; [void][System.Management.Automa
 
 ## 수동 설치 (Claude 없이 전부 직접)
 
-**USB zip.** 맥에서 `./make-zip.sh` 로 `ax-field-kit.zip` 생성 → USB 로 복사 → 고객 PC 에서:
+위 「키트 받기」로 `C:\ax-field-kit`을 만든 뒤:
 
 ```powershell
-# D: 는 USB 드라이브 문자에 맞게 바꾸기
-Expand-Archive D:\ax-field-kit.zip C:\ -Force; cd C:\ax-field-kit
+cd C:\ax-field-kit
 # 원격 통로 전용 일반 계정 (암호는 사람이 직접 입력)
 powershell -ExecutionPolicy Bypass -File .\new-access-account.ps1 -UserName <전용계정>
 # 먼저 통로만 설치 (키 입력은 사람이 직접)
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Customer <고객> -SkipGit -SkipClaude -SkipRecorder -TsTag tag:ax-field -TsHostname <고객> -ExpectedTailnet "<맥북 CurrentTailnet.Name>" -SshUser <전용계정> -SshPublicKey "<공개키 한 줄>" -SshKeyComment ops-<고객>-<기기>-<날짜>
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -SkipGit -SkipClaude -SkipRecorder -TsTag tag:ax-field -TsHostname <고객>-<기기> -ExpectedTailnet "<맥북 CurrentTailnet.Name>" -SshUser <전용계정> -SshPublicKey "<공개키 한 줄>" -SshKeyComment ops-<고객>-<기기>-<날짜>
 # 맥북에서 nc 및 SSH 공개키 로그인 확인 뒤, 민감 화면을 닫고 녹화 설치
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Customer <고객> -SkipClaude -SkipTailscale -SkipSsh
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -SkipClaude -SkipTailscale -SkipSsh
 ```
-(지정한 `customers\<고객>\config.json`이 없으면 오류입니다. `-Customer`를 생략하면 예제 기본값을 씁니다. 만들려면 `customers\_example` 복사.)
-
-**대안: GitHub 공개 저장소 (Git 이 설치돼 있을 때).** 로그인·토큰 없이 받는다.
-
-```powershell
-git clone https://github.com/intellieffect/ax-field-kit-public C:\ax-field-kit
-cd C:\ax-field-kit
-```
+(녹화 설정은 기본값 `customers\_example`을 쓴다. 바꿀 값이 있으면 `customers\_example`을 `customers\<고객>`으로 복사해 고치고 `-Customer <고객>`을 붙인다. 지정한 config 가 없으면 오류.)
 
 중간에 `Tailscale 인증 키`를 물으면 붙여넣는다(화면에 안 보임, 로그·인자에 값이 남지 않음; ACL을 제한한 임시 파일로 전달 후 즉시 삭제). 붙여넣은 뒤 `Win+V` 클립보드 기록에서 해당 항목을 지운다.
 Claude 다운로드·OpenSSH 설치는 진행 표시가 없어 몇 분 멈춘 것처럼 보일 수 있다. 기다리면 된다.
@@ -135,7 +129,7 @@ scp -r 전용계정@<tailscale-ip>:/C:/AxFieldKit/data/recordings ./pull/    # W
 |---|---|
 | 관리자 권한 없음 | 고객사 IT 에 관리자 계정 요청. 불가하면 일반 PowerShell에서 공식 Claude 설치·로그인까지만 하고 중단. install.ps1은 관리자 권한 없으면 중단 |
 | 스크립트 실행 정책 | 항상 `powershell -ExecutionPolicy Bypass -File ...` 로 실행 |
-| GitHub 차단/인증 불가 | 기본 경로(USB zip) 사용 |
+| github.com 차단 | 고객사 IT 에 github.com 허용 요청. 안 되면 그날은 중단 |
 | 실행 정책이 GPO | `Get-ExecutionPolicy -List` 의 MachinePolicy 가 설정돼 있으면 Bypass 가 무시된다 → 고객사 IT 에 문의 |
 | 백신/EDR 이 막음 | recorder.ps1·ffmpeg.exe 를 차단하면 `C:\AxFieldKit` 예외 등록을 IT 에 요청 |
 | winget 없음 | Microsoft Store "앱 설치 관리자" 업데이트, 또는 Git/Tailscale/ffmpeg 수동 설치 후 재실행(ffmpeg.exe 는 `C:\AxFieldKit\bin\` 에) |
@@ -150,4 +144,4 @@ scp -r 전용계정@<tailscale-ip>:/C:/AxFieldKit/data/recordings ./pull/    # W
 
 기존 설정이 있으면 변경 전 스크립트·config·authorized_keys·예약 작업 XML을 날짜 붙인 백업으로 보존하고 sshd 시작형식/상태와 관련 방화벽 규칙을 기록합니다. 백업 실패 시 중단합니다. 새 설치도 시각·변경·명령·복구법을 고객 PC의 setup-report.md에 적고, 지정 관제에는 고객 자료 없이 변경 요지만 전달합니다. PC 이상은 즉시 중단하고 자기 변경을 백업으로 복구한 뒤 관제에 보고합니다.
 
-철수는 담당자 요청 후 녹화 정지·예약 작업 제거·우리 키 제거·Tailscale 로그아웃, 승인된 정책 줄 제거를 따로 확인합니다. 데이터는 보존/삭제를 사람이 결정합니다. 기존 SSH가 있으면 `-KeepSsh`로 유지하고 우리 키만 따로 회수하며, 기존 방화벽·서비스 상태는 사전 기록으로 복구합니다. gui-run을 별도 설치했다면 그 파일/예약 작업도 변경 기록에 따라 회수합니다(이 zip에는 gui-run 없음).
+철수는 담당자 요청 후 녹화 정지·예약 작업 제거·우리 키 제거·Tailscale 로그아웃, 승인된 정책 줄 제거를 따로 확인합니다. 데이터는 보존/삭제를 사람이 결정합니다. 기존 SSH가 있으면 `-KeepSsh`로 유지하고 우리 키만 따로 회수하며, 기존 방화벽·서비스 상태는 사전 기록으로 복구합니다. gui-run을 별도 설치했다면 그 파일/예약 작업도 변경 기록에 따라 회수합니다(키트에는 gui-run 없음).

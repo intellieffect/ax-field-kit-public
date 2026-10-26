@@ -103,7 +103,6 @@ $sec = Read-Host '인증 키' -AsSecureString     # 화면에 안 보임
 
 **추천: ffmpeg `gdigrab` + PowerShell 감시 스크립트(트레이 아이콘·업무 시간·잠금/자리 비움 정지·창 이름 JSONL·오래된 파일 삭제) + 작업 스케줄러 로그온 트리거.**
 **차선: OBS Studio `--startrecording --minimize-to-tray` (작업 스케줄러 로그온 실행).**
-(`recorder.ps1`이 추천안 구조)
 
 | 기준 | ffmpeg gdigrab (추천) | ffmpeg ddagrab | OBS Studio (차선) | ShareX | Windows 기본(Game Bar·캡처 도구) |
 |---|---|---|---|---|---|
@@ -141,3 +140,7 @@ $sec = Read-Host '인증 키' -AsSecureString     # 화면에 안 보임
 
 - 2026-10-12 · 승인: SSH 통로를 관리자 계정·`administrators_authorized_keys`에서 **사람이 만드는 전용 일반 계정(Users만) + 그 계정의 `.ssh\authorized_keys` + 기기별 주석 키(`ops-<고객>-<기기>-<날짜>`)**로 바꾼다. 회수 = 우리 키 제거 + 계정·프로필 삭제. 상세는 [원격-통로.md](원격-통로.md) 6절.
 - 2026-10-16 · 결정("둘 다 추천대로", 리허설 근거): ① 전용 계정만 sshd 비밀번호 로그인을 끈다 — `install.ps1`이 `sshd_config` 끝에 표식 블록(`Match User <계정>` + `PasswordAuthentication no`)을 넣고 `uninstall.ps1`이 그 블록만 지운다(틀린 암호 10회 잠금으로 키 접속이 끊기는 것을 막음). ② 전용 계정 암호 만료는 기본값(42일) 유지 — 만료 뒤에도 키 로그인 됨(리허설 실측), 화면 로그인 때 새 암호. 10/12 추천의 "만료 없음"(`-PasswordNeverExpires`)은 쓰지 않는다.
+
+## 5. 배포 경로
+
+- 2026-10-27 · 결정: 배포를 USB zip 에서 공개 저장소 다운로드(`intellieffect/ax-field-kit-public` main zip, 로그인 없음)로 바꾼다. `make-zip.sh`·`.gitattributes` 삭제. 현장에서 도는 스크립트가 공개판이므로 키 주석 접두와 전용 계정 표식을 공개판과 같은 `ops-<고객>-<기기>-<날짜>`·`Remote access (ax-field-kit)`로 맞춘다.

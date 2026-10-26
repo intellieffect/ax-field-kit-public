@@ -18,7 +18,7 @@
    ```powershell
    Get-ChildItem *.ps1 | ForEach-Object { $e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$null,[ref]$e); "{0}: 오류 {1}개 {2}" -f $_.Name, $e.Count, (($e | ForEach-Object { "L$($_.Extent.StartLineNumber) $($_.Message)" }) -join ' / ') }
    ```
-2. **사전 확인·복구 준비.** Windows 10/11, 관리자 권한, 인터넷, 디스크 5GB 이상, 로그인 고객 계정과 관리자 계정을 구분합니다. 한글 이름은 그대로 유지하고 `$env:USERPROFILE`·`Join-Path`·따옴표를 사용합니다. 녹화 예약 작업은 로그인 고객의 `DOMAIN\사용자`로 등록합니다. 기존 스크립트/config/관리자·전용 계정 authorized_keys/작업 XML이 있으면 `*.bak-<날짜>`로 보존하고, sshd 상태·시작형식·관련 방화벽 규칙을 기록합니다. 백업 실패 시 중단합니다. SSH는 **전용 일반 계정**(Users 그룹만, 관리자 아님)이며 키 파일은 그 계정의 `.ssh\authorized_keys`입니다. 키 주석은 `ops-<고객>-<기기>-<날짜>`(영문·숫자·`-`만)입니다. 전용 계정 이름·공개키 본문·키 주석·고객 설정 ID를 사람이 지정합니다. 기본 예시는 `_example`이며 해당 config가 없으면 중단합니다. 공개키 없이 비밀번호 통로로 바꾸지 않습니다.
+2. **사전 확인·복구 준비.** Windows 10/11, 관리자 권한, 인터넷, 디스크 5GB 이상, 로그인 고객 계정과 관리자 계정을 구분합니다. 한글 이름은 그대로 유지하고 `$env:USERPROFILE`·`Join-Path`·따옴표를 사용합니다. 녹화 예약 작업은 로그인 고객의 `DOMAIN\사용자`로 등록합니다. 기존 스크립트/config/관리자·전용 계정 authorized_keys/작업 XML이 있으면 `*.bak-<날짜>`로 보존하고, sshd 상태·시작형식·관련 방화벽 규칙을 기록합니다. 백업 실패 시 중단합니다. SSH는 **전용 일반 계정**(Users 그룹만, 관리자 아님)이며 키 파일은 그 계정의 `.ssh\authorized_keys`입니다. 키 주석은 `ops-<고객>-<기기>-<날짜>`(영문·숫자·`-`만)입니다. 전용 계정 이름·공개키 본문·키 주석·Tailscale 기기 이름(`<고객>-<기기>`)을 사람이 지정합니다. 녹화 설정은 기본값(`customers\_example`)을 씁니다. 사람이 바꿀 값을 말하면 `customers\_example`을 `customers\<고객>`으로 복사해 그 값만 고치고 `-Customer <고객>`을 붙입니다. 공개키 없이 비밀번호 통로로 바꾸지 않습니다.
 3. **전용 계정은 사람이 직접 → OpenSSH 통로 설치(녹화·앱·가입 제외).**
    먼저 사람이 새 관리자 PowerShell에서 전용 계정을 만들도록 안내합니다(순서 4의 Tailscale 키 입력과 같은 방식). 암호는 사람이 화면에서 입력하고, Claude는 이 스크립트를 대신 실행하지 않으며 암호를 묻거나 받지 않습니다. 고객 본인 계정·잠금 정책·`LimitBlankPasswordUse`는 건드리지 않습니다.
    ```powershell
@@ -27,19 +27,19 @@
    ```
    사람이 완료했다고 하면 출력의 `Users=True Administrators=False`를 확인한 뒤 SSH 단계를 실행합니다. 계정이 없거나 Administrators 소속이면 install이 실패로 멈춥니다(그룹 변경은 사람이 결정).
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Customer <고객> -SkipGit -SkipClaude -SkipTailscale -SkipRecorder -SshUser <전용계정> -SshPublicKey "<맥북 공개키>" -SshKeyComment ops-<고객>-<기기>-<날짜>
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -SkipGit -SkipClaude -SkipTailscale -SkipRecorder -SshUser <전용계정> -SshPublicKey "<맥북 공개키>" -SshKeyComment ops-<고객>-<기기>-<날짜>
    ```
    결과가 실패면 중단합니다. `-ContinueOnError`를 사용하지 않습니다. 관리자 키 파일(`administrators_authorized_keys`)에는 등록하지 않습니다.
 4. **Tailscale 설치·가입은 사람이 직접.** 맥북 `CurrentTailnet.Name`을 사람에게 확인해 아래 `<맥북 CurrentTailnet.Name>`을 실제 기대 이름으로 바꿉니다. 미지정·다른 테일넷·이름 확인 불가면 install/check가 실패합니다. README의 인증 키 발급·태그·정책 승인 준비를 확인하고 사람이 새 관리자 PowerShell에서 다음 명령을 직접 실행하도록 안내합니다. Claude가 대신 실행하지 않습니다.
    ```powershell
    cd C:\ax-field-kit
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -SkipGit -SkipClaude -SkipRecorder -SkipSsh -TsTag tag:ax-field -TsHostname <고객> -ExpectedTailnet "<맥북 CurrentTailnet.Name>"
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -SkipGit -SkipClaude -SkipRecorder -SkipSsh -TsTag tag:ax-field -TsHostname <고객>-<기기> -ExpectedTailnet "<맥북 CurrentTailnet.Name>"
    ```
    사람이 완료했다고 해도 `tailscale status --json`의 가입 테일넷·태그와 `tailscale ip -4`를 확인합니다. 기존에 다른 테일넷으로 가입돼 있으면 로그아웃/재가입을 자동 실행하지 말고 중단합니다.
-5. **맥북에서 통로 확인(사람/지정 관제 몫).** 승인된 정책에서 `nc -vz <ip> 22`와 **전용 계정**으로 SSH 공개키 로그인을 확인합니다. SSH 별칭 `User`에는 전용 계정 이름을 적습니다. `tailscale ping`만으로 성공 판정하지 않습니다. Taildrop은 태그 기기에서 미지원일 수 있으므로 USB·SSH/SFTP를 기본으로 하고, Taildrop 수신 파일은 다운로드 폴더에서 찾습니다. 통로 확인 전 녹화 설치 금지.
+5. **맥북에서 통로 확인(사람/지정 관제 몫).** 승인된 정책에서 `nc -vz <ip> 22`와 **전용 계정**으로 SSH 공개키 로그인을 확인합니다. SSH 별칭 `User`에는 전용 계정 이름을 적습니다. `tailscale ping`만으로 성공 판정하지 않습니다. Taildrop은 태그 기기에서 미지원일 수 있으므로 SSH/SFTP를 기본으로 하고, Taildrop 수신 파일은 다운로드 폴더에서 찾습니다. 통로 확인 전 녹화 설치 금지.
 6. **통로 확인 뒤 Git·녹화 설치.** 민감정보 없는 화면에서 사람이 녹화 설치를 진행하라고 한 경우만 실행합니다. 민감 화면을 계속 쓰면 `-SkipRecorder`를 붙여 녹화를 보류합니다.
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Customer <고객> -SkipClaude -SkipTailscale -SkipSsh
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -SkipClaude -SkipTailscale -SkipSsh
    ```
    창/프로세스 자동 제외·일시정지 단축키는 미지원입니다. 홈택스·인증서 비밀번호·거래처 개인정보 화면을 열기 전에 트레이 일시정지 → 약 2초 뒤 회색 paused와 ffmpeg 정지를 확인합니다. 민감 창을 닫은 뒤 재개합니다. 영상과 활동 제목 모두 멈추며, 기존 자료는 삭제되지 않습니다.
 7. **확인.** 관리자 PowerShell에서 `powershell -NoProfile -ExecutionPolicy Bypass -File .\check.ps1 -ExpectedTailnet "<맥북 CurrentTailnet.Name>" -SshUser <전용계정>` 실행(전용 계정 존재·그룹·잠김·우리 키 줄 수 포함). 트레이를 작업 표시줄에 고정하도록 안내합니다. 업무시간 중 5분 뒤 mkv 존재·0보다 큰 크기, 활동 파일 존재만 확인하고 실제 화면 검수는 사람이 민감정보 없는 영상 하나로 합니다. 모니터 2대/배율도 확인합니다. 업무시간 밖은 대기 정상으로 쓰고 다음 업무시간 검증을 남깁니다.
