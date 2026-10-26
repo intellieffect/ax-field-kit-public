@@ -134,3 +134,10 @@ $sec = Read-Host '인증 키' -AsSecureString     # 화면에 안 보임
 ### 정교한 판(이후)
 
 정교한 Windows판은 이후 Tailscale+SSH로 원격 교체.
+
+---
+
+## 4. 원격 통로 SSH 계정
+
+- 2026-10-12 · 승인: SSH 통로를 관리자 계정·`administrators_authorized_keys`에서 **사람이 만드는 전용 일반 계정(Users만) + 그 계정의 `.ssh\authorized_keys` + 기기별 주석 키(`ops-<고객>-<기기>-<날짜>`)**로 바꾼다. 회수 = 우리 키 제거 + 계정·프로필 삭제. 상세는 [원격-통로.md](원격-통로.md) 6절.
+- 2026-10-16 · 결정("둘 다 추천대로", 리허설 근거): ① 전용 계정만 sshd 비밀번호 로그인을 끈다 — `install.ps1`이 `sshd_config` 끝에 표식 블록(`Match User <계정>` + `PasswordAuthentication no`)을 넣고 `uninstall.ps1`이 그 블록만 지운다(틀린 암호 10회 잠금으로 키 접속이 끊기는 것을 막음). ② 전용 계정 암호 만료는 기본값(42일) 유지 — 만료 뒤에도 키 로그인 됨(리허설 실측), 화면 로그인 때 새 암호. 10/12 추천의 "만료 없음"(`-PasswordNeverExpires`)은 쓰지 않는다.

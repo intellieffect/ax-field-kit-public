@@ -2,7 +2,7 @@
 # 단독 실행 가능. install.ps1 이 호출한다. 관리자 PowerShell 에서 실행.
 param(
     [string]$InstallDir = 'C:\AxFieldKit',
-    [string]$ConfigFile,                 # 예: customers\<이름>\config.json (없으면 기본값)
+    [string]$ConfigFile,                 # 예: customers\<고객>\config.json (없으면 기본값)
     [string]$TaskUser                    # 녹화 대상 Windows 사용자 (기본: 지금 로그인해 있는 사용자)
 )
 $ErrorActionPreference = 'Stop'

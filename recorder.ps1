@@ -1,6 +1,6 @@
 ﻿# AX Field Kit - 화면 녹화 런타임 (로그인 시 작업 스케줄러가 실행)
 # 트레이 아이콘으로 항상 표시된다(빨강=녹화 중, 회색=대기/일시정지). 몰래 돌지 않는다.
-# 동작: 업무 시간 + 화면 잠금 아님 + 자리 비움 아님 일 때만 ffmpeg(gdigrab)로 초당 1장 녹화,
+# 동작: 화면 켜짐 + 업무 시간 + 화면 잠금 아님 + 자리 비움 아님 일 때만 ffmpeg(gdigrab)로 초당 1장 녹화,
 #       활성 앱/창 이름을 JSONL로 기록, 오래된 파일 자동 삭제.
 param([string]$ConfigPath = (Join-Path $PSScriptRoot 'config.json'))
 
@@ -47,6 +47,57 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class AxNative {
+    // PowerSettingRegisterNotification sends an initial value as well as changes.
+    // Keep the native callback rooted; it only updates state, never calls PowerShell.
+    private static readonly Guid SessionDisplayStatus = new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5");
+    private static volatile int displayState = -1;
+    private static IntPtr displayRegistration = IntPtr.Zero;
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate uint PowerCallback(IntPtr context, uint type, IntPtr setting);
+    private static readonly PowerCallback displayCallback = OnDisplayPower;
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PowerSubscription { public IntPtr Callback; public IntPtr Context; }
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerSettingRegisterNotification(ref Guid setting, uint flags,
+        ref PowerSubscription recipient, out IntPtr registration);
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerSettingUnregisterNotification(IntPtr registration);
+    private static uint OnDisplayPower(IntPtr context, uint type, IntPtr setting) {
+        if (type != 0x8013) return 0; // PBT_POWERSETTINGCHANGE
+        if (setting == IntPtr.Zero) { displayState = -1; return 0; }
+        try {
+            Guid id = (Guid)Marshal.PtrToStructure(setting, typeof(Guid));
+            if (id != SessionDisplayStatus) return 0;
+            // POWERBROADCAST_SETTING: GUID (16 bytes), DWORD length, DWORD value.
+            if (Marshal.ReadInt32(setting, 16) != 4) { displayState = -1; return 0; }
+            int value = Marshal.ReadInt32(setting, 20);
+            displayState = value >= 0 && value <= 2 ? value : -1;
+        } catch { displayState = -1; }
+        return 0;
+    }
+    public static uint StartDisplayNotifications() {
+        if (displayRegistration != IntPtr.Zero) return 0;
+        displayState = -1; // fail closed until the first notification
+        Guid id = SessionDisplayStatus;
+        PowerSubscription recipient = new PowerSubscription();
+        recipient.Callback = Marshal.GetFunctionPointerForDelegate(displayCallback);
+        uint result = PowerSettingRegisterNotification(ref id, 2, ref recipient, out displayRegistration);
+        if (result != 0) { displayRegistration = IntPtr.Zero; displayState = -1; }
+        return result;
+    }
+    public static string DisplayPauseReason() {
+        int state = displayState;
+        if (state == 0) return "display_off";
+        if (state == 1 || state == 2) return ""; // dimmed is still visible
+        return "display_unknown";
+    }
+    public static void StopDisplayNotifications() {
+        if (displayRegistration != IntPtr.Zero) {
+            PowerSettingUnregisterNotification(displayRegistration);
+            displayRegistration = IntPtr.Zero;
+        }
+        displayState = -1;
+    }
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
@@ -69,6 +120,11 @@ public static class AxNative {
 }
 '@
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+
+try {
+    $displayResult = [AxNative]::StartDisplayNotifications()
+    if ($displayResult -ne 0) { Write-SysLog "화면 상태 알림 등록 실패 code=$displayResult - 녹화 대기" }
+} catch { Write-SysLog '화면 상태 알림 등록 오류 - 녹화 대기' }
 
 function Get-ActiveWindow {
     $h = [AxNative]::GetForegroundWindow()
@@ -132,7 +188,7 @@ function Start-Rec {
         '-hide_banner', '-loglevel', 'error', '-nostats', '-y',
         '-f', 'gdigrab', '-framerate', "$Fps", '-draw_mouse', '1', '-i', 'desktop',
         '-vf', "scale='min($MaxWidth,iw)':-2",
-        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', "$Crf", '-pix_fmt', 'yuv420p', '-g', '10',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', "$Crf", '-pix_fmt', 'yuv420p', '-g', '10', '-threads', '2',
         '-f', 'segment', '-segment_time', "$SegmentSec", '-reset_timestamps', '1', '-strftime', '1',
         ('"{0}"' -f $out)
     )
@@ -152,6 +208,8 @@ function Stop-Rec {
 
 function Test-ShouldRecord {
     if ($script:paused) { return 'paused' }
+    $displayReason = [AxNative]::DisplayPauseReason()
+    if ($displayReason) { return $displayReason }
     $now = Get-Date
     if ($WorkDays -notcontains [int]$now.DayOfWeek) { return 'offday' }
     if ($now.TimeOfDay -lt $WorkStart -or $now.TimeOfDay -ge $WorkEnd) { return 'offhours' }
@@ -216,6 +274,7 @@ Write-SysLog "recorder 시작 (업무 $WorkStart~$WorkEnd, ${Fps}fps, 보관 ${R
 try { [System.Windows.Forms.Application]::Run() }
 finally {
     $timer.Stop(); Stop-Rec
+    [AxNative]::StopDisplayNotifications()
     $tray.Visible = $false; $tray.Dispose()
     Write-SysLog 'recorder 종료'
     $mutex.ReleaseMutex()
