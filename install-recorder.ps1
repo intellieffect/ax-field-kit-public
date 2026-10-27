@@ -56,7 +56,7 @@ $cfg | Add-Member -NotePropertyName ffmpegPath -NotePropertyValue $ffmpegDest -F
 [System.IO.File]::WriteAllText($cfgDest, ($cfg | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false))
 Say "설정: $cfgDest (업무시간 $($cfg.workStart)~$($cfg.workEnd), 보관 $($cfg.retentionDays)일)"
 
-# 4) 작업 스케줄러: 로그인 시 자동 시작 (대상 사용자 권한, 숨김 창 + 트레이 표시)
+# 4) 작업 스케줄러: 로그인 시 자동 시작 (대상 사용자 권한, 숨김 창, 트레이는 config showTray 기본 숨김)
 if (-not $TaskUser) {
     $owner = Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" | ForEach-Object { Invoke-CimMethod -InputObject $_ -MethodName GetOwner } | Select-Object -First 1
     if ($owner -and $owner.User) { $TaskUser = "$($owner.Domain)\$($owner.User)" } else { $TaskUser = "$env:USERDOMAIN\$env:USERNAME" }
@@ -69,14 +69,14 @@ $principal = New-ScheduledTaskPrincipal -UserId $TaskUser -LogonType Interactive
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
     -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings `
-    -Description 'AX Field Kit 화면 녹화 (트레이 표시, 업무 시간만)' -Force | Out-Null
+    -Description 'AX Field Kit 화면 녹화 (업무 시간만)' -Force | Out-Null
 Say "작업 스케줄러 등록: $TaskName"
 
 # 5) 지금 바로 시작
 Start-ScheduledTask -TaskName $TaskName
 Start-Sleep -Seconds 4
 $running = Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match 'recorder\.ps1' }
-if ($running) { Say '녹화 프로그램 실행 중 (트레이 아이콘 확인: 업무시간 안이면 빨강, 밖이면 회색)' }
+if ($running) { Say '녹화 프로그램 실행 중 (트레이는 기본 숨김 - 녹화 여부는 data\recordings 의 새 파일로 확인)' }
 else { throw "녹화 프로그램이 시작되지 않았습니다. $data\recorder.log 와 작업 스케줄러 '$TaskName' 를 확인하세요. 시작 단계 오류는 $env:TEMP\AxFieldKit-recorder-crash.log (녹화 대상 사용자의 TEMP)에도 남습니다." }
 
 Write-Host "  데이터 처리: 저장 위치 $data, 보관 $($cfg.retentionDays)일 후 자동 삭제, 열람은 담당자(Tailscale)만." -ForegroundColor DarkGray

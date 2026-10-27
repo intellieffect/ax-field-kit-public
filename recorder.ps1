@@ -1,5 +1,5 @@
 ﻿# AX Field Kit - 화면 녹화 런타임 (로그인 시 작업 스케줄러가 실행)
-# 트레이 아이콘으로 항상 표시된다(빨강=녹화 중, 회색=대기/일시정지). 몰래 돌지 않는다.
+# 트레이 아이콘·알림은 기본 숨김(config showTray=true 면 표시: 빨강=녹화 중, 회색=대기/일시정지). 서면 동의를 받은 PC 에만 설치한다.
 # 동작: 화면 켜짐 + 업무 시간 + 화면 잠금 아님 + 자리 비움 아님 일 때만 ffmpeg(gdigrab)로 초당 1장 녹화,
 #       활성 앱/창 이름을 JSONL로 기록, 오래된 파일 자동 삭제.
 param([string]$ConfigPath = (Join-Path $PSScriptRoot 'config.json'))
@@ -166,7 +166,7 @@ $script:state = ''
 $tray = New-Object System.Windows.Forms.NotifyIcon
 $tray.Icon = $iconIdle
 $tray.Text = 'AX 화면 녹화 - 대기'
-$tray.Visible = $true
+$tray.Visible = [bool](Cfg 'showTray' $false)
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $miInfo  = $menu.Items.Add(("업무 시간 {0:hh\:mm}~{1:hh\:mm} 에만 녹화합니다" -f $WorkStart, $WorkEnd)); $miInfo.Enabled = $false
 $miPause = $menu.Items.Add('일시정지')

@@ -8,5 +8,6 @@
   "segmentSeconds": 300,
   "retentionDays": 14,
   "idleSeconds": 300,
-  "minFreeGB": 5
+  "minFreeGB": 5,
+  "showTray": false
 }
